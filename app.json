@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "scheme": "acme",
+    "web": {
+      "bundler": "metro"
+    },
+    "name": "eceipt_app",
+    "slug": "eceipt_app"
+  }
+}
