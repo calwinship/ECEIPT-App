@@ -1,5 +1,13 @@
-import React, { useCallback, useState } from 'react';
-import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { Link, useFocusEffect } from 'expo-router';
 import { loadReceipts } from '../lib/storage';
 import ReceiptCard, { formatMoney } from '../components/ReceiptCard';
@@ -16,8 +24,18 @@ const monthlyTotal = (receipts) => {
     .reduce((sum, r) => sum + (r.total || 0), 0);
 };
 
+const matches = (receipt, query) => {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  if ((receipt.merchant?.name || '').toLowerCase().includes(q)) return true;
+  if ((receipt.user_metadata?.note || '').toLowerCase().includes(q)) return true;
+  if ((receipt.user_metadata?.tags || []).some((t) => t.toLowerCase().includes(q))) return true;
+  return (receipt.items || []).some((it) => (it.name || '').toLowerCase().includes(q));
+};
+
 const Home = () => {
   const [receipts, setReceipts] = useState([]);
+  const [query, setQuery] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -31,28 +49,60 @@ const Home = () => {
     }, [])
   );
 
+  const filtered = useMemo(() => receipts.filter((r) => matches(r, query)), [receipts, query]);
   const total = monthlyTotal(receipts);
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.headerLabel}>This month</Text>
-        <Text style={styles.headerTotal}>{formatMoney(total)}</Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerLabel}>This month</Text>
+            <Text style={styles.headerTotal}>{formatMoney(total)}</Text>
+          </View>
+          <View style={styles.headerActions}>
+            <Link href="/insights" asChild>
+              <Pressable style={styles.headerBtn}>
+                <Text style={styles.headerBtnText}>Insights</Text>
+              </Pressable>
+            </Link>
+            <Link href="/settings" asChild>
+              <Pressable style={styles.headerBtn}>
+                <Text style={styles.headerBtnText}>Settings</Text>
+              </Pressable>
+            </Link>
+          </View>
+        </View>
+        <TextInput
+          style={styles.search}
+          placeholder="Search merchant, item, tag…"
+          placeholderTextColor="#9ca3af"
+          value={query}
+          onChangeText={setQuery}
+          autoCorrect={false}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+        />
       </View>
 
       <FlatList
-        data={receipts}
+        data={filtered}
         keyExtractor={(r) => r.receipt_id}
         renderItem={({ item }) => <ReceiptCard receipt={item} />}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>No receipts yet</Text>
+            <Text style={styles.emptyTitle}>
+              {query ? 'No matches' : 'No receipts yet'}
+            </Text>
             <Text style={styles.emptyBody}>
-              Tap the scan button to add your first receipt.
+              {query
+                ? 'Try a different search term.'
+                : 'Tap the scan button to add your first receipt.'}
             </Text>
           </View>
         }
-        contentContainerStyle={receipts.length === 0 ? styles.emptyContainer : styles.list}
+        contentContainerStyle={filtered.length === 0 ? styles.emptyContainer : styles.list}
+        keyboardShouldPersistTaps="handled"
       />
 
       <Link href="/scan" asChild>
@@ -69,13 +119,31 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 20,
+    paddingBottom: 16,
     backgroundColor: '#fff',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e5e7eb',
   },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  headerBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  headerBtnText: { color: '#111827', fontWeight: '500', fontSize: 13 },
   headerLabel: { fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 },
   headerTotal: { fontSize: 32, fontWeight: '700', marginTop: 4 },
+  search: {
+    marginTop: 16,
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    fontSize: 15,
+  },
   list: { paddingTop: 12, paddingBottom: 96 },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
   empty: { alignItems: 'center', paddingHorizontal: 32 },

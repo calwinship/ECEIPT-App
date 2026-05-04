@@ -1,14 +1,51 @@
-import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { deleteReceipt, findReceipt } from '../../lib/storage';
+import { deleteReceipt, findReceipt, updateReceiptMetadata } from '../../lib/storage';
 import { formatDate, formatMoney } from '../../components/ReceiptCard';
+
+const buildShareText = (r) => {
+  const lines = [
+    r.merchant?.name || 'Receipt',
+    formatDate(r.purchased_at),
+    '',
+    ...r.items.map(
+      (it) =>
+        `${it.qty > 1 ? `${it.qty} × ` : ''}${it.name} — ${formatMoney(
+          (it.unit_price || 0) * (it.qty || 1),
+          r.currency
+        )}`
+    ),
+    '',
+    `Subtotal: ${formatMoney(r.subtotal, r.currency)}`,
+    `Tax: ${formatMoney(r.tax, r.currency)}`,
+    `Total: ${formatMoney(r.total, r.currency)}`,
+  ];
+  return lines.join('\n');
+};
+
+const parseTagInput = (input) =>
+  input
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 const ReceiptDetail = () => {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [receipt, setReceipt] = useState(null);
   const [missing, setMissing] = useState(false);
+  const [tagDraft, setTagDraft] = useState('');
+  const [noteDraft, setNoteDraft] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -24,6 +61,17 @@ const ReceiptDetail = () => {
     }, [id])
   );
 
+  useEffect(() => {
+    if (!receipt) return;
+    setTagDraft((receipt.user_metadata?.tags || []).join(', '));
+    setNoteDraft(receipt.user_metadata?.note || '');
+  }, [receipt?.receipt_id]);
+
+  const persistMetadata = async (next) => {
+    const updated = await updateReceiptMetadata(id, next);
+    if (updated) setReceipt(updated);
+  };
+
   const onDelete = () => {
     Alert.alert('Delete receipt?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
@@ -36,6 +84,15 @@ const ReceiptDetail = () => {
         },
       },
     ]);
+  };
+
+  const onShare = async () => {
+    if (!receipt) return;
+    try {
+      await Share.share({ message: buildShareText(receipt) });
+    } catch {
+      // User cancelled or share unavailable; nothing to do.
+    }
   };
 
   if (missing) {
@@ -98,6 +155,33 @@ const ReceiptDetail = () => {
         ) : null}
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Tags</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="business, reimbursable, groceries"
+          placeholderTextColor="#9ca3af"
+          value={tagDraft}
+          onChangeText={setTagDraft}
+          onBlur={() => persistMetadata({ tags: parseTagInput(tagDraft) })}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <Text style={styles.sectionTitle}>Note</Text>
+        <TextInput
+          style={[styles.input, styles.noteInput]}
+          placeholder="Add a note…"
+          placeholderTextColor="#9ca3af"
+          value={noteDraft}
+          onChangeText={setNoteDraft}
+          onBlur={() => persistMetadata({ note: noteDraft })}
+          multiline
+        />
+      </View>
+
+      <Pressable style={styles.shareBtn} onPress={onShare}>
+        <Text style={styles.shareText}>Share</Text>
+      </Pressable>
       <Pressable style={styles.deleteBtn} onPress={onDelete}>
         <Text style={styles.deleteText}>Delete receipt</Text>
       </Pressable>
@@ -120,7 +204,14 @@ const styles = StyleSheet.create({
   date: { color: '#6b7280', marginTop: 8 },
   total: { fontSize: 28, fontWeight: '700', marginTop: 12 },
   card: { backgroundColor: '#fff', padding: 16, borderRadius: 12, marginBottom: 12 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', marginBottom: 8 },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginTop: 4,
+  },
   itemRow: {
     flexDirection: 'row',
     paddingVertical: 8,
@@ -142,8 +233,24 @@ const styles = StyleSheet.create({
   totalsLabelFinal: { fontWeight: '700' },
   totalsValueFinal: { fontWeight: '700' },
   payment: { marginTop: 12, color: '#6b7280', fontSize: 13 },
+  input: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    fontSize: 15,
+    marginBottom: 8,
+  },
+  noteInput: { minHeight: 70, textAlignVertical: 'top' },
+  shareBtn: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    marginBottom: 8,
+  },
+  shareText: { color: '#fff', fontWeight: '600' },
   deleteBtn: {
-    marginTop: 8,
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
