@@ -1,0 +1,58 @@
+import React from 'react';
+import { Pressable, Text, View, StyleSheet } from 'react-native';
+import { Link } from 'expo-router';
+
+export const formatMoney = (amount, currency = 'USD') => {
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+  } catch {
+    return `${currency} ${Number(amount).toFixed(2)}`;
+  }
+};
+
+export const formatDate = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const ReceiptCard = ({ receipt }) => (
+  <Link href={`/receipt/${receipt.receipt_id}`} asChild>
+    <Pressable style={styles.card}>
+      <View style={styles.row}>
+        <Text style={styles.merchant} numberOfLines={1}>
+          {receipt.merchant?.name || 'Unknown merchant'}
+        </Text>
+        <Text style={styles.total}>{formatMoney(receipt.total, receipt.currency)}</Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.meta}>{formatDate(receipt.purchased_at)}</Text>
+        <Text style={styles.meta}>
+          {receipt.items.length} item{receipt.items.length === 1 ? '' : 's'}
+        </Text>
+      </View>
+    </Pressable>
+  </Link>
+);
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  merchant: { fontSize: 16, fontWeight: '600', flex: 1, marginRight: 8 },
+  total: { fontSize: 16, fontWeight: '600' },
+  meta: { fontSize: 13, color: '#666', marginTop: 4 },
+});
+
+export default ReceiptCard;
