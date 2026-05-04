@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { clearAll, loadReceipts } from '../lib/storage';
 import { SCHEMA_VERSION } from '../lib/schema';
+import { receiptsToCSV } from '../lib/export';
 
 const Row = ({ label, value }) => (
   <View style={styles.row}>
@@ -27,6 +28,22 @@ const Settings = () => {
       };
     }, [])
   );
+
+  const onExportAll = async () => {
+    const all = await loadReceipts();
+    if (all.length === 0) {
+      Alert.alert('Nothing to export', 'You have no receipts yet.');
+      return;
+    }
+    try {
+      await Share.share({
+        message: receiptsToCSV(all),
+        title: 'eceipt-export.csv',
+      });
+    } catch {
+      // ignore
+    }
+  };
 
   const onClear = () => {
     Alert.alert(
@@ -63,6 +80,10 @@ const Settings = () => {
         </Text>
       </View>
 
+      <Pressable style={styles.action} onPress={onExportAll}>
+        <Text style={styles.actionText}>Export all as CSV</Text>
+      </Pressable>
+
       <Pressable style={styles.danger} onPress={onClear}>
         <Text style={styles.dangerText}>Delete all receipts</Text>
       </Pressable>
@@ -91,6 +112,14 @@ const styles = StyleSheet.create({
   rowLabel: { color: '#374151' },
   rowValue: { color: '#6b7280' },
   body: { color: '#374151', lineHeight: 20 },
+  action: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#111827',
+    marginBottom: 8,
+  },
+  actionText: { color: '#fff', fontWeight: '600' },
   danger: { paddingVertical: 14, borderRadius: 10, alignItems: 'center', backgroundColor: '#fff' },
   dangerText: { color: '#dc2626', fontWeight: '600' },
 });

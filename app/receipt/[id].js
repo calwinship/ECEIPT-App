@@ -12,6 +12,18 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { deleteReceipt, findReceipt, updateReceiptMetadata } from '../../lib/storage';
 import { formatDate, formatMoney } from '../../components/ReceiptCard';
+import { receiptToCSV } from '../../lib/export';
+
+const RETURN_WINDOW_DAYS = 30;
+
+const daysLeftToReturn = (purchasedAt) => {
+  const purchase = new Date(purchasedAt);
+  if (Number.isNaN(purchase.getTime())) return null;
+  const deadline = new Date(purchase);
+  deadline.setDate(deadline.getDate() + RETURN_WINDOW_DAYS);
+  const ms = deadline.getTime() - Date.now();
+  return Math.ceil(ms / (1000 * 60 * 60 * 24));
+};
 
 const buildShareText = (r) => {
   const lines = [
@@ -95,6 +107,18 @@ const ReceiptDetail = () => {
     }
   };
 
+  const onExportCSV = async () => {
+    if (!receipt) return;
+    try {
+      await Share.share({
+        message: receiptToCSV(receipt),
+        title: `${receipt.merchant?.name || 'Receipt'}.csv`,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
   if (missing) {
     return (
       <View style={styles.center}>
@@ -105,6 +129,8 @@ const ReceiptDetail = () => {
   if (!receipt) return <View style={styles.center} />;
 
   const { merchant, items, subtotal, tax, total, currency, payment, purchased_at } = receipt;
+  const daysLeft = daysLeftToReturn(purchased_at);
+  const showReturnBadge = daysLeft !== null && daysLeft > 0 && daysLeft <= RETURN_WINDOW_DAYS;
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -113,6 +139,13 @@ const ReceiptDetail = () => {
         {merchant?.address ? <Text style={styles.address}>{merchant.address}</Text> : null}
         <Text style={styles.date}>{formatDate(purchased_at)}</Text>
         <Text style={styles.total}>{formatMoney(total, currency)}</Text>
+        {showReturnBadge ? (
+          <View style={styles.returnBadge}>
+            <Text style={styles.returnText}>
+              {daysLeft} day{daysLeft === 1 ? '' : 's'} left to return
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.card}>
@@ -179,9 +212,14 @@ const ReceiptDetail = () => {
         />
       </View>
 
-      <Pressable style={styles.shareBtn} onPress={onShare}>
-        <Text style={styles.shareText}>Share</Text>
-      </Pressable>
+      <View style={styles.actions}>
+        <Pressable style={[styles.shareBtn, styles.flex1]} onPress={onShare}>
+          <Text style={styles.shareText}>Share</Text>
+        </Pressable>
+        <Pressable style={[styles.exportBtn, styles.flex1]} onPress={onExportCSV}>
+          <Text style={styles.exportText}>Export CSV</Text>
+        </Pressable>
+      </View>
       <Pressable style={styles.deleteBtn} onPress={onDelete}>
         <Text style={styles.deleteText}>Delete receipt</Text>
       </Pressable>
@@ -242,14 +280,33 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   noteInput: { minHeight: 70, textAlignVertical: 'top' },
+  actions: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+  flex1: { flex: 1, marginHorizontal: 4 },
   shareBtn: {
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     backgroundColor: '#111827',
-    marginBottom: 8,
   },
   shareText: { color: '#fff', fontWeight: '600' },
+  exportBtn: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#111827',
+  },
+  exportText: { color: '#111827', fontWeight: '600' },
+  returnBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  returnText: { color: '#166534', fontSize: 12, fontWeight: '600' },
   deleteBtn: {
     paddingVertical: 14,
     borderRadius: 10,

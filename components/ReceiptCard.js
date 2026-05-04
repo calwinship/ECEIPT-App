@@ -16,24 +16,36 @@ export const formatDate = (iso) => {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-const ReceiptCard = ({ receipt }) => (
-  <Link href={`/receipt/${receipt.receipt_id}`} asChild>
-    <Pressable style={styles.card}>
-      <View style={styles.row}>
-        <Text style={styles.merchant} numberOfLines={1}>
-          {receipt.merchant?.name || 'Unknown merchant'}
-        </Text>
-        <Text style={styles.total}>{formatMoney(receipt.total, receipt.currency)}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.meta}>{formatDate(receipt.purchased_at)}</Text>
-        <Text style={styles.meta}>
-          {receipt.items.length} item{receipt.items.length === 1 ? '' : 's'}
-        </Text>
-      </View>
-    </Pressable>
-  </Link>
-);
+const ReceiptCard = ({ receipt }) => {
+  const tags = (receipt.user_metadata?.tags || []).slice(0, 3);
+  return (
+    <Link href={`/receipt/${receipt.receipt_id}`} asChild>
+      <Pressable style={styles.card}>
+        <View style={styles.row}>
+          <Text style={styles.merchant} numberOfLines={1}>
+            {receipt.merchant?.name || 'Unknown merchant'}
+          </Text>
+          <Text style={styles.total}>{formatMoney(receipt.total, receipt.currency)}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.meta}>{formatDate(receipt.purchased_at)}</Text>
+          <Text style={styles.meta}>
+            {receipt.items.length} item{receipt.items.length === 1 ? '' : 's'}
+          </Text>
+        </View>
+        {tags.length > 0 ? (
+          <View style={styles.tagRow}>
+            {tags.map((t) => (
+              <View key={t} style={styles.tag}>
+                <Text style={styles.tagText}>{t}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </Pressable>
+    </Link>
+  );
+};
 
 const styles = StyleSheet.create({
   card: {
@@ -53,6 +65,16 @@ const styles = StyleSheet.create({
   merchant: { fontSize: 16, fontWeight: '600', flex: 1, marginRight: 8 },
   total: { fontSize: 16, fontWeight: '600' },
   meta: { fontSize: 13, color: '#666', marginTop: 4 },
+  tagRow: { flexDirection: 'row', marginTop: 8, flexWrap: 'wrap' },
+  tag: {
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginRight: 6,
+    marginTop: 4,
+  },
+  tagText: { color: '#3730a3', fontSize: 11, fontWeight: '500' },
 });
 
 export default ReceiptCard;
