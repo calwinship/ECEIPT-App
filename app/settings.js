@@ -1,10 +1,21 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { clearAll, loadReceipts } from '../lib/storage';
 import { SCHEMA_VERSION } from '../lib/schema';
 import { receiptsToCSV } from '../lib/export';
+import { loadPreferences, savePreferences, PREFERENCE_DEFAULTS } from '../lib/preferences';
+import { sanitizePreferences } from '../lib/preferences-schema';
 
 const Row = ({ label, value }) => (
   <View style={styles.row}>
@@ -16,18 +27,27 @@ const Row = ({ label, value }) => (
 const Settings = () => {
   const router = useRouter();
   const [count, setCount] = useState(0);
+  const [returnDays, setReturnDays] = useState(String(PREFERENCE_DEFAULTS.return_window_days));
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      loadReceipts().then((r) => {
-        if (!cancelled) setCount(r.length);
+      Promise.all([loadReceipts(), loadPreferences()]).then(([r, p]) => {
+        if (cancelled) return;
+        setCount(r.length);
+        setReturnDays(String(p.return_window_days));
       });
       return () => {
         cancelled = true;
       };
     }, [])
   );
+
+  const persistReturnDays = async () => {
+    const sanitized = sanitizePreferences({ return_window_days: returnDays });
+    await savePreferences({ return_window_days: sanitized.return_window_days });
+    setReturnDays(String(sanitized.return_window_days));
+  };
 
   const onExportAll = async () => {
     const all = await loadReceipts();
@@ -74,17 +94,47 @@ const Settings = () => {
       </View>
 
       <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Returns</Text>
+        <Text style={styles.body}>
+          The "days left to return" badge appears on receipts purchased within this window.
+        </Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={returnDays}
+            onChangeText={setReturnDays}
+            onBlur={persistReturnDays}
+            keyboardType="number-pad"
+            maxLength={4}
+            accessibilityLabel="Return window in days"
+          />
+          <Text style={styles.inputSuffix}>days</Text>
+        </View>
+      </View>
+
+      <View style={styles.card}>
         <Text style={styles.sectionTitle}>Privacy</Text>
         <Text style={styles.body}>
           Receipts are stored only on this device. Nothing is uploaded to any server.
         </Text>
       </View>
 
-      <Pressable style={styles.action} onPress={onExportAll}>
+      <Pressable
+        style={styles.action}
+        onPress={onExportAll}
+        accessibilityRole="button"
+        accessibilityLabel="Export all receipts as CSV"
+      >
         <Text style={styles.actionText}>Export all as CSV</Text>
       </Pressable>
 
-      <Pressable style={styles.danger} onPress={onClear}>
+      <Pressable
+        style={styles.danger}
+        onPress={onClear}
+        accessibilityRole="button"
+        accessibilityLabel="Delete all receipts"
+        accessibilityHint="Permanently removes every receipt from this device"
+      >
         <Text style={styles.dangerText}>Delete all receipts</Text>
       </Pressable>
     </ScrollView>
@@ -112,6 +162,17 @@ const styles = StyleSheet.create({
   rowLabel: { color: '#374151' },
   rowValue: { color: '#6b7280' },
   body: { color: '#374151', lineHeight: 20 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  input: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    fontSize: 16,
+    width: 100,
+    textAlign: 'center',
+  },
+  inputSuffix: { marginLeft: 10, color: '#374151' },
   action: {
     paddingVertical: 14,
     borderRadius: 10,

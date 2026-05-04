@@ -55,10 +55,19 @@ const ScanScreen = () => {
         <Text style={styles.body}>
           ECEIPT needs the camera to scan receipt QR codes. Receipts stay on your device.
         </Text>
-        <Pressable style={styles.button} onPress={requestPermission}>
+        <Pressable
+          style={styles.button}
+          onPress={requestPermission}
+          accessibilityRole="button"
+          accessibilityLabel="Grant camera access"
+        >
           <Text style={styles.buttonText}>Grant access</Text>
         </Pressable>
-        <Pressable onPress={() => router.back()}>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Text style={styles.link}>Go back</Text>
         </Pressable>
       </View>
@@ -76,7 +85,12 @@ const ScanScreen = () => {
         <View style={styles.frame} />
         <Text style={styles.hint}>Point at a receipt QR code</Text>
       </View>
-      <Pressable style={styles.cancel} onPress={() => router.back()}>
+      <Pressable
+        style={styles.cancel}
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Cancel scanning"
+      >
         <Text style={styles.cancelText}>Cancel</Text>
       </Pressable>
     </View>

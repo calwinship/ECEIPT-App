@@ -10,19 +10,8 @@ import {
 } from 'react-native';
 import { Link, useFocusEffect } from 'expo-router';
 import { loadReceipts } from '../lib/storage';
+import { monthOverMonthTrend } from '../lib/trends';
 import ReceiptCard, { formatMoney } from '../components/ReceiptCard';
-
-const monthlyTotal = (receipts) => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  return receipts
-    .filter((r) => {
-      const d = new Date(r.purchased_at);
-      return d.getFullYear() === y && d.getMonth() === m;
-    })
-    .reduce((sum, r) => sum + (r.total || 0), 0);
-};
 
 const matches = (receipt, query) => {
   if (!query) return true;
@@ -50,7 +39,10 @@ const Home = () => {
   );
 
   const filtered = useMemo(() => receipts.filter((r) => matches(r, query)), [receipts, query]);
-  const total = monthlyTotal(receipts);
+  const trend = useMemo(() => monthOverMonthTrend(receipts), [receipts]);
+  const trendColor =
+    trend.direction === 'up' ? '#b91c1c' : trend.direction === 'down' ? '#15803d' : '#6b7280';
+  const trendArrow = trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '→';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -58,16 +50,29 @@ const Home = () => {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.headerLabel}>This month</Text>
-            <Text style={styles.headerTotal}>{formatMoney(total)}</Text>
+            <Text style={styles.headerTotal}>{formatMoney(trend.current)}</Text>
+            {trend.label ? (
+              <Text style={[styles.trendLabel, { color: trendColor }]}>
+                {trendArrow} {trend.label}
+              </Text>
+            ) : null}
           </View>
           <View style={styles.headerActions}>
             <Link href="/insights" asChild>
-              <Pressable style={styles.headerBtn}>
+              <Pressable
+                style={styles.headerBtn}
+                accessibilityRole="link"
+                accessibilityLabel="Open insights"
+              >
                 <Text style={styles.headerBtnText}>Insights</Text>
               </Pressable>
             </Link>
             <Link href="/settings" asChild>
-              <Pressable style={styles.headerBtn}>
+              <Pressable
+                style={styles.headerBtn}
+                accessibilityRole="link"
+                accessibilityLabel="Open settings"
+              >
                 <Text style={styles.headerBtnText}>Settings</Text>
               </Pressable>
             </Link>
@@ -82,6 +87,8 @@ const Home = () => {
           autoCorrect={false}
           autoCapitalize="none"
           clearButtonMode="while-editing"
+          accessibilityLabel="Search receipts"
+          accessibilityHint="Filters receipts by merchant, item, tag, or note"
         />
       </View>
 
@@ -106,7 +113,12 @@ const Home = () => {
       />
 
       <Link href="/scan" asChild>
-        <Pressable style={styles.fab}>
+        <Pressable
+          style={styles.fab}
+          accessibilityRole="button"
+          accessibilityLabel="Scan a new receipt"
+          accessibilityHint="Opens the camera to scan a QR code"
+        >
           <Text style={styles.fabIcon}>＋</Text>
         </Pressable>
       </Link>
@@ -136,6 +148,7 @@ const styles = StyleSheet.create({
   headerBtnText: { color: '#111827', fontWeight: '500', fontSize: 13 },
   headerLabel: { fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 },
   headerTotal: { fontSize: 32, fontWeight: '700', marginTop: 4 },
+  trendLabel: { fontSize: 12, fontWeight: '600', marginTop: 4 },
   search: {
     marginTop: 16,
     backgroundColor: '#f3f4f6',

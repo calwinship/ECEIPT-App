@@ -18,9 +18,20 @@ export const formatDate = (iso) => {
 
 const ReceiptCard = ({ receipt }) => {
   const tags = (receipt.user_metadata?.tags || []).slice(0, 3);
+  const a11yLabel = `${receipt.merchant?.name || 'Unknown merchant'}, ${formatMoney(
+    receipt.total,
+    receipt.currency
+  )}, ${formatDate(receipt.purchased_at)}, ${receipt.items.length} item${
+    receipt.items.length === 1 ? '' : 's'
+  }`;
   return (
     <Link href={`/receipt/${receipt.receipt_id}`} asChild>
-      <Pressable style={styles.card}>
+      <Pressable
+        style={styles.card}
+        accessibilityRole="button"
+        accessibilityLabel={a11yLabel}
+        accessibilityHint="Opens this receipt"
+      >
         <View style={styles.row}>
           <Text style={styles.merchant} numberOfLines={1}>
             {receipt.merchant?.name || 'Unknown merchant'}

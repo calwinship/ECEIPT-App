@@ -13,14 +13,13 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { deleteReceipt, findReceipt, updateReceiptMetadata } from '../../lib/storage';
 import { formatDate, formatMoney } from '../../components/ReceiptCard';
 import { receiptToCSV } from '../../lib/export';
+import { loadPreferences, PREFERENCE_DEFAULTS } from '../../lib/preferences';
 
-const RETURN_WINDOW_DAYS = 30;
-
-const daysLeftToReturn = (purchasedAt) => {
+const daysLeftToReturn = (purchasedAt, windowDays) => {
   const purchase = new Date(purchasedAt);
   if (Number.isNaN(purchase.getTime())) return null;
   const deadline = new Date(purchase);
-  deadline.setDate(deadline.getDate() + RETURN_WINDOW_DAYS);
+  deadline.setDate(deadline.getDate() + windowDays);
   const ms = deadline.getTime() - Date.now();
   return Math.ceil(ms / (1000 * 60 * 60 * 24));
 };
@@ -58,12 +57,14 @@ const ReceiptDetail = () => {
   const [missing, setMissing] = useState(false);
   const [tagDraft, setTagDraft] = useState('');
   const [noteDraft, setNoteDraft] = useState('');
+  const [returnWindow, setReturnWindow] = useState(PREFERENCE_DEFAULTS.return_window_days);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      findReceipt(id).then((r) => {
+      Promise.all([findReceipt(id), loadPreferences()]).then(([r, p]) => {
         if (cancelled) return;
+        setReturnWindow(p.return_window_days);
         if (!r) setMissing(true);
         else setReceipt(r);
       });
@@ -129,8 +130,8 @@ const ReceiptDetail = () => {
   if (!receipt) return <View style={styles.center} />;
 
   const { merchant, items, subtotal, tax, total, currency, payment, purchased_at } = receipt;
-  const daysLeft = daysLeftToReturn(purchased_at);
-  const showReturnBadge = daysLeft !== null && daysLeft > 0 && daysLeft <= RETURN_WINDOW_DAYS;
+  const daysLeft = daysLeftToReturn(purchased_at, returnWindow);
+  const showReturnBadge = daysLeft !== null && daysLeft > 0 && daysLeft <= returnWindow;
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -199,6 +200,7 @@ const ReceiptDetail = () => {
           onBlur={() => persistMetadata({ tags: parseTagInput(tagDraft) })}
           autoCapitalize="none"
           autoCorrect={false}
+          accessibilityLabel="Tags, comma separated"
         />
         <Text style={styles.sectionTitle}>Note</Text>
         <TextInput
@@ -209,18 +211,35 @@ const ReceiptDetail = () => {
           onChangeText={setNoteDraft}
           onBlur={() => persistMetadata({ note: noteDraft })}
           multiline
+          accessibilityLabel="Note"
         />
       </View>
 
       <View style={styles.actions}>
-        <Pressable style={[styles.shareBtn, styles.flex1]} onPress={onShare}>
+        <Pressable
+          style={[styles.shareBtn, styles.flex1]}
+          onPress={onShare}
+          accessibilityRole="button"
+          accessibilityLabel="Share receipt as text"
+        >
           <Text style={styles.shareText}>Share</Text>
         </Pressable>
-        <Pressable style={[styles.exportBtn, styles.flex1]} onPress={onExportCSV}>
+        <Pressable
+          style={[styles.exportBtn, styles.flex1]}
+          onPress={onExportCSV}
+          accessibilityRole="button"
+          accessibilityLabel="Export receipt as CSV"
+        >
           <Text style={styles.exportText}>Export CSV</Text>
         </Pressable>
       </View>
-      <Pressable style={styles.deleteBtn} onPress={onDelete}>
+      <Pressable
+        style={styles.deleteBtn}
+        onPress={onDelete}
+        accessibilityRole="button"
+        accessibilityLabel="Delete this receipt"
+        accessibilityHint="Removes the receipt from this device"
+      >
         <Text style={styles.deleteText}>Delete receipt</Text>
       </Pressable>
     </ScrollView>
